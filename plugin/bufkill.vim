@@ -1,7 +1,7 @@
 " bufkill.vim 
 " Maintainer:	John Orr (john underscore orr yahoo com)
-" Version:	    1.0
-" Last Change:	01 December 2004
+" Version:	    1.1
+" Last Change:	02 December 2004
 
 " Introduction: {{{1
 " Basic Usage:
@@ -60,10 +60,8 @@
 "   instead keep it's info so that we can jump forwards to it again
 "   eg in case of a mistake (one level of undo is already implemented).
 
-" Bugfixes:
-"   Patience...
-
 " Changelog:
+" 1.1 - Fix handling of modified, un-named buffers
 " 1.0 - initial functionality
 
 " Reload guard and 'compatible' handling {{{1
@@ -206,7 +204,7 @@ function! <SID>BufKill(cmd, bang) "{{{1
   " If the buffer is already '[No File]' then doing enew won't create a new
   " buffer, hence the bd/bw command will kill the current buffer and take
   " the window with it... so check for this case
-  if bufname('%') == ''
+  if bufname('%') == '' && ! &modified
     " No buffer to kill
     return
   endif
