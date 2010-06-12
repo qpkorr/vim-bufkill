@@ -1,7 +1,7 @@
 " bufkill.vim 
-" Maintainer:	John Orr (john underscore orr yahoo com)
-" Version:	    1.1
-" Last Change:	02 December 2004
+" Maintainer:	John Orr (john undersc0re orr yah00 c0m)
+" Version:	    1.2
+" Last Change:	02 May 2006
 
 " Introduction: {{{1
 " Basic Usage:
@@ -61,8 +61,20 @@
 "   eg in case of a mistake (one level of undo is already implemented).
 
 " Changelog:
+" 1.2 - Add column-saving support, to ensure returning to a buffer means
+"       positioning the cursor not only at the right line, but also column
 " 1.1 - Fix handling of modified, un-named buffers
 " 1.0 - initial functionality
+"
+" Implementation Notes:
+" w:BufKillList stores the list of buffers accessed so far, in order
+"      of most recent access, for each respective window.
+" w:BufKillColumnList store the list of columns the cursor was in when
+"      a buffer was left.  It follows that since w:BufKillList lists
+"      all buffers ever entered, but w:BufKillColumnList lists columns
+"      only for those exited, the latter is expected to be one element
+"      shorted than the former (since the current buffer should only be 
+"      entered, but not yet exited).
 
 " Reload guard and 'compatible' handling {{{1
 let s:save_cpo = &cpo
@@ -118,6 +130,16 @@ endif
 "   :BD or :BUN will use 'buflisted'
 if !exists('g:BufKillFunctionSelectingValidBuffersToDisplay')
   let g:BufKillFunctionSelectingValidBuffersToDisplay = 'buflisted' 
+endif
+
+" g:BufKillActionWhenModifiedFileToBeKilled {{{2
+" When a request is made to kill (wipe, delete, or unload) a modified buffer
+" and the "bang" (!) wasn't included in the commend, two possibilities exist: 
+" 1) Fail in the same way as :bw or :bd would, or
+" 2) Prompt the user to save, not save, or cancel the request.
+" Possible values are 'fail' (for options 1), and 'prompt' for option 2
+if !exists('g:BufKillActionWhenModifiedFileToBeKilled')
+  let g:BufKillActionWhenModifiedFileToBeKilled = 'prompt'
 endif
 
 " g:BufKillVerbose {{{2
@@ -204,9 +226,15 @@ function! <SID>BufKill(cmd, bang) "{{{1
   " If the buffer is already '[No File]' then doing enew won't create a new
   " buffer, hence the bd/bw command will kill the current buffer and take
   " the window with it... so check for this case
+  " However - if it's a scratch buffer with text enew should create a new
+  " buffer, so don't return if it is a scratch buffer
   if bufname('%') == '' && ! &modified
-    " No buffer to kill
-    return
+    " No buffer to kill, ensure not scratch buffer
+    if &buftype == 'nofile' && &swapfile == 0
+      " Is scratch buffer, keep processing
+    else
+      return
+    endif
   endif
 
   " Just to make sure, check that this matches the last one on the list - else
@@ -219,8 +247,37 @@ function! <SID>BufKill(cmd, bang) "{{{1
   " If the buffer is modified, and a:bang is not set, give the same kind of
   " error as normal bw
   if &modified && strlen(a:bang) == 0
-    echoe "No write since last change for buffer '" . bufname(s:BufKillBufferToKill) . "' (add ! to override)"
-    return 
+    if g:BufKillActionWhenModifiedFileToBeKilled =~ '[Ff][Aa][Ii][Ll]'
+      echoe "No write since last change for buffer '" . bufname(s:BufKillBufferToKill) . "' (add ! to override)"
+      return 
+    elseif g:BufKillActionWhenModifiedFileToBeKilled =~ '[Pp][Rr][Oo][Mm][Pp][Tt]'
+      let options = "&Yes\n&No\n&Cancel"
+      let actionAdjustment = 0
+      let bufname = bufname(winbufnr(winnr()))
+      if bufname == ''
+        let bufname = '[No File]'
+        let options = "&No\n&Cancel"
+        let actionAdjustment = 1
+      endif
+      let action=confirm("Save Changes in " . bufname . " before removing it?", options)
+      if action + actionAdjustment == 1
+        " Yes - try to save - if there is an error, cancel
+        let v:errmsg = ""
+        silent w
+        if v:errmsg != ""
+          echoerr "Unable to write buffer!"
+          return
+        endif
+      elseif action + actionAdjustment == 2
+        " No, abandon changes
+        set nomodified
+      else
+        " Cancel (or any other result), don't do the open
+        return
+      endif
+    else
+      echoe "Illegal value (' . g:BufKillActionWhenModifiedFileToBeKilled . ') stored in variable g:BufKillActionWhenModifiedFileToBeKilled"
+    endif
   endif
 
   " Get a list of all windows which have this buffer loaded
@@ -259,7 +316,32 @@ function! <SID>BufKill(cmd, bang) "{{{1
   let i = 0
   while i < <SID>ArrayLen("s:BufKillWindowListWithBufferLoaded")
     let win = <SID>ArrayGet("s:BufKillWindowListWithBufferLoaded", i)
-    call <SID>GotoPreviousBuffer(win, a:cmd)
+
+    " Go to the right window in which to perform the action 
+    if win > 0
+      exec 'normal ' . win . 'w'
+    endif
+
+    " Go to the previous buffer for this window
+    call <SID>GotoPreviousBuffer(a:cmd)
+
+    " Update the lists to remove any buffers no longer loaded (which can't be
+    " returned to except by reopening them, or using the UNDO function (for
+    " which information is stored separately).  Note that GotoPreviousBuffer
+    " will cleanup as well, since buffers can be killed in ways that don't
+    " invoke this script - but cleaning up here should help minimise list
+    " lengths.
+    if a:cmd == 'bw' || a:cmd == 'bd'
+      let existingIndex = <SID>ArrayFindFirst('w:BufKillList', s:BufKillBufferToKill)
+      if existingIndex >= 0
+        call <SID>ArrayDel('w:BufKillList', existingIndex)
+        call <SID>ArrayDel('w:BufKillColumnList', existingIndex)
+      else
+        echom 'BufKill Internal Error: existingIndex = ' . existingIndex . ' but should be greater than 0.'
+        echom 'Please notify the author of the circumstances of this message!'
+      endif
+    endif
+
     let i = i + 1
   endwhile
 
@@ -277,13 +359,8 @@ function! <SID>BufKill(cmd, bang) "{{{1
 
 endfunction
 
-function! <SID>GotoPreviousBuffer(win, cmd) "{{{1
+function! <SID>GotoPreviousBuffer(cmd) "{{{1
   "Function to display the previous buffer for the specified window
-
-  " Go to the right window in which to perform the action 
-  if a:win > 0
-    exec 'normal ' . a:win . 'w'
-  endif
 
   " Handle the 'auto' setting for 
   " g:BufKillFunctionSelectingValidBuffersToDisplay
@@ -298,18 +375,22 @@ function! <SID>GotoPreviousBuffer(win, cmd) "{{{1
 
   " Find the most recent _listed_ buffer to display
   let newBuffer = <SID>ArrayGet('w:BufKillList', -2)
+  let newColumn = <SID>ArrayGet('w:BufKillColumnList', -1)
   exec 'while newBuffer != -1 && !' . validityFunction . '(newBuffer)' 
     call <SID>ArrayDel('w:BufKillList', -2)
+    call <SID>ArrayDel('w:BufKillColumnList', -1)
     let newBuffer = <SID>ArrayGet('w:BufKillList', -2)
+    let newColumn = <SID>ArrayGet('w:BufKillColumnList', -1)
   endwhile
     
   " Handle the case of no valid buffer number to display
   if newBuffer == -1
     let cmd = g:BufKillCommandWhenLastBufferKilled
   else
-    let cmd = 'b' . newBuffer
+    let cmd = 'b' . newBuffer . "|call cursor(line('.')," . newColumn . ')'
   endif
   exec cmd
+
 endfunction
 
 function! <SID>UndoKill() "{{{1
@@ -361,13 +442,33 @@ function! <SID>UpdateList(event) "{{{1
   if !exists('w:BufKillList')
     let w:BufKillList = ""
   endif
+  if !exists('w:BufKillColumnList')
+    let w:BufKillColumnList = ""
+  endif
   let bufferNum = bufnr('%')
   " Kill existing occurences
   let existingIndex = <SID>ArrayFindFirst('w:BufKillList', bufferNum)
   if existingIndex != -1
     call <SID>ArrayDel('w:BufKillList', existingIndex)
+    if existingIndex < <SID>ArrayLen('w:BufKillColumnList')
+      call <SID>ArrayDel('w:BufKillColumnList', existingIndex)
+    endif
   endif
   call <SID>ArrayAdd('w:BufKillList', bufferNum)
+
+endfunction
+
+function! <SID>UpdateLastColumn(event) "{{{1
+  " Function to save the current column and buffer and window numbers, 
+  let index = <SID>ArrayFindFirst('w:BufKillList', bufnr('%'))
+  if index != -1
+    if index != <SID>ArrayLen('w:BufKillList') - 1
+      echom "Internal surprise - index = ".index.", ArrayLen(w:BufKillList) = ".<SID>ArrayLen('w:BufKillList')
+    endif
+    call <SID>ArraySet('w:BufKillColumnList', index, col('.'))
+  else
+    echom 'UpdateLastColumn failed to find bufnr ' . bufnr('%') . ' in w:BufKillList'
+  endif
 endfunction
 
 
@@ -379,7 +480,7 @@ endfunction
 " represent a list like 1 3333 2 as
 "     1 3333    2
 " allowing g:BufKillListElementSize chars for each number.
-let s:spaces = '                                               '
+let s:spaces = '                                                                     '
 function! <SID>ArrayAdd(var,elem) "{{{2
   " Add an element to the end of an array
   if !exists(a:var)
@@ -411,7 +512,7 @@ function! <SID>ArrayLen(var) "{{{2
 endfunction
 
 function! <SID>ArrayGet(var,index) "{{{2
-  "Get a value from a list array.  Allow negative values,
+  "Get a value from a list array.  Allow negative indices,
   "such that -1 gets the last value, etc
   let elem = -1
   if !exists(a:var)
@@ -429,6 +530,34 @@ function! <SID>ArrayGet(var,index) "{{{2
   endif
   " Add 0 to the value to change it from a string to a number
   return elem + 0
+endfunction
+
+function! <SID>ArraySet(var,index,elem) "{{{2
+  "Set an element in a list array.  Allow negative indices,
+  "such that -1 sets the last elem, etc
+  if !exists(a:var)
+    echoe "ArrayGet Error: array '" . a:var . "' does not exist!"
+  endif
+
+  let newIndex = a:index
+  exec 'let newList = ' . a:var
+  if newIndex < 0
+    let newIndex =strlen(newList)/g:BufKillListElementSize + newIndex 
+  endif
+
+  if <SID>ArrayIndexIsOutOfBounds(a:var, newIndex)
+    " Extend the array to handle the set action
+    let extensionLength = ( newIndex - <SID>ArrayLen(a:var) + 1 ) * g:BufKillListElementSize
+    if extensionLength > strlen(s:spaces)
+      echoe 's:spaces is ' . strlen(s:spaces) . ' spaces long, but needs to be ' . extensionLength 
+    endif
+    exec 'let '.a:var.'='.a:var.' . strpart(s:spaces, 0, extensionLength)'
+  endif
+
+  " Calculate the padded element
+  let paddedElem = strpart(s:spaces, 0, (g:BufKillListElementSize - strlen(a:elem))) . a:elem
+  " Now set it, taking the first and last parts of a:var
+  exec 'let '.a:var.'= strpart('.a:var.', 0, a:index * g:BufKillListElementSize) . paddedElem . strpart('.a:var.', (a:index + 1) * g:BufKillListElementSize)'
 endfunction
 
 function! <SID>ArrayDel(var,index) "{{{2
@@ -500,6 +629,9 @@ endfunction
 augroup BufKill
 autocmd BufKill WinEnter * call <SID>UpdateList('WinEnter')
 autocmd BufKill BufEnter * call <SID>UpdateList('BufEnter')
+autocmd BufKill WinLeave * call <SID>UpdateLastColumn('WinLeave')
+autocmd BufKill BufLeave * call <SID>UpdateLastColumn('BufLeave')
+" autocmd BufKill BufWinLeave * call <SID>UpdateLastColumn('BufWinLeave')
 
 " Cleanup and modelines {{{1
 let &cpo = s:save_cpo
