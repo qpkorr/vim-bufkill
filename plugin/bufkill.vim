@@ -1,7 +1,7 @@
 " bufkill.vim
 " Maintainer:	John Orr (john undersc0re orr yah00 c0m)
-" Version:	    1.8
-" Last Change:	20th July 2010
+" Version:	    1.9
+" Last Change:	31st Dec 2010
 
 " Introduction: {{{1
 " Basic Usage:
@@ -44,6 +44,8 @@
 " updating to new versions of this script won't affect your settings.
 
 " Credits:
+" Dimitar Dimitrov - for improvements in mappings and robustness
+" A few people who pointed out bugs I'd fixed but not made public.
 " Magnus Thor Torfason - for improvements relating to the 'confirm' setting.
 " Keith Roberts - for many hours of email discussions, ideas and suggestions
 "   to try to get the details as good as possible.
@@ -65,6 +67,7 @@
 "   last view in that file.
 
 " Changelog:
+" 1.9 - Remove unnecessary mapping delays, and debug messages
 " 1.8 - Improved mapping handling, and robustness
 " 1.7 - Minor improvements.
 " 1.6 - Added (opt-in) Ctrl-^ override support to preserve cursor column
@@ -212,12 +215,12 @@ noremap <Plug>BufKillAlt     :call <SID>GotoBuffer('#')<CR>
 noremap <Plug>BufKillBack    :call <SID>GotoBuffer('bufback')<CR>
 noremap <Plug>BufKillForward :call <SID>GotoBuffer('bufforward')<CR>
 noremap <Plug>BufKillBun     :call <SID>BufKill('bun', '')<CR>
-noremap <Plug>BufKillBunBang :call <SID>BufKill('bun', '!')<CR>
+noremap <Plug>BufKillBangBun :call <SID>BufKill('bun', '!')<CR>
 noremap <Plug>BufKillBd      :call <SID>BufKill('bd', '')<CR>
-noremap <Plug>BufKillBdBang  :call <SID>BufKill('bd', '!')<CR>
+noremap <Plug>BufKillBangBd  :call <SID>BufKill('bd', '!')<CR>
 noremap <Plug>BufKillBw      :call <SID>BufKill('bw', '')<CR>
-noremap <Plug>BufKillBwBang  :call <SID>BufKill('bw', '!')<CR>
-noremap <Plug>BufKillBundo   :call <SID>UndoKill()<CR>
+noremap <Plug>BufKillBangBw  :call <SID>BufKill('bw', '!')<CR>
+noremap <Plug>BufKillUndo    :call <SID>UndoKill()<CR>
 
 function! <SID>CreateUniqueMapping(lhs, rhs, ...)
   if hasmapto(a:rhs) && !(a:0 == 1 && a:1 == 'AllowDuplicate')
@@ -233,12 +236,12 @@ endfunction
 call <SID>CreateUniqueMapping('<Leader>bb',   '<Plug>BufKillBack')
 call <SID>CreateUniqueMapping('<Leader>bf',   '<Plug>BufKillForward')
 call <SID>CreateUniqueMapping('<Leader>bun',  '<Plug>BufKillBun')
-call <SID>CreateUniqueMapping('<Leader>!bun', '<Plug>BufKillBunBang')
+call <SID>CreateUniqueMapping('<Leader>!bun', '<Plug>BufKillBangBun')
 call <SID>CreateUniqueMapping('<Leader>bd',   '<Plug>BufKillBd')
-call <SID>CreateUniqueMapping('<Leader>!bd',  '<Plug>BufKillBdBang')
+call <SID>CreateUniqueMapping('<Leader>!bd',  '<Plug>BufKillBangBd')
 call <SID>CreateUniqueMapping('<Leader>bw',   '<Plug>BufKillBw')
-call <SID>CreateUniqueMapping('<Leader>!bw',  '<Plug>BufKillBwBang')
-call <SID>CreateUniqueMapping('<Leader>bundo','<Plug>BufKillBundo')
+call <SID>CreateUniqueMapping('<Leader>!bw',  '<Plug>BufKillBangBw')
+call <SID>CreateUniqueMapping('<Leader>bundo','<Plug>BufKillUndo')
 call <SID>CreateUniqueMapping('<Leader>ba',   '<Plug>BufKillAlt')
 if g:BufKillOverrideCtrlCaret == 1
   call <SID>CreateUniqueMapping('<C-^>', '<Plug>BufKillAlt', 'AllowDuplicate')
@@ -460,7 +463,6 @@ function! <SID>GotoBuffer(cmd) "{{{1
   if w:BufKillIndex < 0 || w:BufKillIndex >= len(w:BufKillList)
     let newBuffer = -1
   else
-    echom "w:BufKillIndex = ".w:BufKillIndex
     let newBuffer = w:BufKillList[w:BufKillIndex]
     let newColumn = w:BufKillColumnList[w:BufKillIndex]
     exec 'let validityResult = '.validityFunction.'(newBuffer)'
