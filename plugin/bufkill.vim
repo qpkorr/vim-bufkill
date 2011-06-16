@@ -1,7 +1,7 @@
 " bufkill.vim
 " Maintainer:	John Orr (john undersc0re orr yah00 c0m)
-" Version:	    1.9
-" Last Change:	31st Dec 2010
+" Version:	1.10
+" Last Change:	16 June 2011
 
 " Introduction: {{{1
 " Basic Usage:
@@ -67,18 +67,19 @@
 "   last view in that file.
 
 " Changelog:
-" 1.9 - Remove unnecessary mapping delays, and debug messages
-" 1.8 - Improved mapping handling, and robustness
-" 1.7 - Minor improvements.
-" 1.6 - Added (opt-in) Ctrl-^ override support to preserve cursor column
-" 1.5 - Improved honouring of the 'confirm' vim option.
-" 1.4 - Add buffer navigation, support for scratch buffer removal
-" 1.3 - Convert to vim 7 lists instead of string-based lists
-" 1.2 - Add column-saving support, to ensure returning to a buffer means
-"       positioning the cursor not only at the right line, but also column,
-"       and prompting the user when removing modified buffers
-" 1.1 - Fix handling of modified, un-named buffers
-" 1.0 - initial functionality
+" 1.10 - Various fixes, eg relating to quicklists
+" 1.9  - Remove unnecessary mapping delays, and a debug message
+" 1.8  - Improved mapping handling, and robustness
+" 1.7  - Minor improvements.
+" 1.6  - Added (opt-in) Ctrl-^ override support to preserve cursor column
+" 1.5  - Improved honouring of the 'confirm' vim option.
+" 1.4  - Add buffer navigation, support for scratch buffer removal
+" 1.3  - Convert to vim 7 lists instead of string-based lists
+" 1.2  - Add column-saving support, to ensure returning to a buffer means
+"        positioning the cursor not only at the right line, but also column,
+"        and prompting the user when removing modified buffers
+" 1.1  - Fix handling of modified, un-named buffers
+" 1.0  - initial functionality
 "
 " Implementation Notes:
 " w:BufKillList stores the list of buffers accessed so far, in order
@@ -185,13 +186,13 @@ endif
 " Commands {{{1
 "
 if !exists(':BA')
-  command       BA    :call <SID>GotoBuffer('#')
+  command -bang BA    :call <SID>GotoBuffer('#',"<bang>")
 endif
 if !exists(':BB')
-  command       BB    :call <SID>GotoBuffer('bufback')
+  command -bang BB    :call <SID>GotoBuffer('bufback',"<bang>")
 endif
 if !exists(':BF')
-  command       BF    :call <SID>GotoBuffer('bufforward')
+  command -bang BF    :call <SID>GotoBuffer('bufforward',"<bang>")
 endif
 if !exists(':BD')
   command -bang BD    :call <SID>BufKill('bd',"<bang>")
@@ -211,16 +212,19 @@ endif
 
 " Keyboard mappings {{{1
 "
-noremap <Plug>BufKillAlt     :call <SID>GotoBuffer('#')<CR>
-noremap <Plug>BufKillBack    :call <SID>GotoBuffer('bufback')<CR>
-noremap <Plug>BufKillForward :call <SID>GotoBuffer('bufforward')<CR>
-noremap <Plug>BufKillBun     :call <SID>BufKill('bun', '')<CR>
-noremap <Plug>BufKillBangBun :call <SID>BufKill('bun', '!')<CR>
-noremap <Plug>BufKillBd      :call <SID>BufKill('bd', '')<CR>
-noremap <Plug>BufKillBangBd  :call <SID>BufKill('bd', '!')<CR>
-noremap <Plug>BufKillBw      :call <SID>BufKill('bw', '')<CR>
-noremap <Plug>BufKillBangBw  :call <SID>BufKill('bw', '!')<CR>
-noremap <Plug>BufKillUndo    :call <SID>UndoKill()<CR>
+noremap <Plug>BufKillAlt         :call <SID>GotoBuffer('#', '')<CR>
+noremap <Plug>BufKillBangAlt     :call <SID>GotoBuffer('#', '!')<CR>
+noremap <Plug>BufKillBack        :call <SID>GotoBuffer('bufback', '')<CR>
+noremap <Plug>BufKillBangBack    :call <SID>GotoBuffer('bufback', '!')<CR>
+noremap <Plug>BufKillForward     :call <SID>GotoBuffer('bufforward', '')<CR>
+noremap <Plug>BufKillBangForward :call <SID>GotoBuffer('bufforward', '!')<CR>
+noremap <Plug>BufKillBun         :call <SID>BufKill('bun', '')<CR>
+noremap <Plug>BufKillBangBun     :call <SID>BufKill('bun', '!')<CR>
+noremap <Plug>BufKillBd          :call <SID>BufKill('bd', '')<CR>
+noremap <Plug>BufKillBangBd      :call <SID>BufKill('bd', '!')<CR>
+noremap <Plug>BufKillBw          :call <SID>BufKill('bw', '')<CR>
+noremap <Plug>BufKillBangBw      :call <SID>BufKill('bw', '!')<CR>
+noremap <Plug>BufKillUndo        :call <SID>UndoKill()<CR>
 
 function! <SID>CreateUniqueMapping(lhs, rhs, ...)
   if hasmapto(a:rhs) && !(a:0 == 1 && a:1 == 'AllowDuplicate')
@@ -266,7 +270,7 @@ function! <SID>BufKill(cmd, bang) "{{{1
   " the window with it... so check for this case
   " However - if it's a scratch buffer with text enew should create a new
   " buffer, so don't return if it is a scratch buffer
-  if bufname('%') == '' && ! &modified
+  if bufname('%') == '' && ! &modified && &modifiable
     " No buffer to kill, ensure not scratch buffer
     if &buftype == 'nofile' && &swapfile == 0
       " Is scratch buffer, keep processing
@@ -370,7 +374,7 @@ function! <SID>BufKill(cmd, bang) "{{{1
     endif
 
     " Go to the previous buffer for this window
-    call <SID>GotoBuffer(a:cmd)
+    call <SID>GotoBuffer(a:cmd, a:bang)
 
     let i = i + 1
   endwhile
@@ -384,12 +388,18 @@ function! <SID>BufKill(cmd, bang) "{{{1
   let s:BufKillLastWindowListWithBufferLoaded = s:BufKillWindowListWithBufferLoaded
   let s:BufKillLastBufferKilledPath = s:BufKillBufferToKillPath
   let s:BufKillLastBufferKilledNum = s:BufKillBufferToKill
-  let killCmd = a:cmd . a:bang . s:BufKillBufferToKill
-  exec killCmd
+  " In some cases (eg when deleting the quickfix buffer) the buffer will
+  " already have been deleted by the switching to another buffer in its
+  " window.  Thus we must check before deleting.
+  if bufexists(s:BufKillBufferToKill)
+    let killCmd = a:cmd . a:bang . s:BufKillBufferToKill
+    exec killCmd
+  else
+  endif
 
 endfunction
 
-function! <SID>GotoBuffer(cmd) "{{{1
+function! <SID>GotoBuffer(cmd, bang) "{{{1
   "Function to display the previous buffer for the specified window
   " a:cmd is one of
   "     bw - Wiping the current buffer
@@ -401,7 +411,7 @@ function! <SID>GotoBuffer(cmd) "{{{1
   "         file, which does not happen with regular Ctrl-^.
 
   if (a:cmd=='bw' || a:cmd=='bd')
-    let w:BufKillLastCmd = a:cmd
+    let w:BufKillLastCmd = a:cmd . a:bang
     " Handle the 'auto' setting for
     " g:BufKillFunctionSelectingValidBuffersToDisplay
     let validityFunction = g:BufKillFunctionSelectingValidBuffersToDisplay
@@ -432,7 +442,7 @@ function! <SID>GotoBuffer(cmd) "{{{1
     elseif a:cmd == 'bufback'
       let w:BufKillIndex -= 1
     elseif a:cmd == '#'
-      let bufnum = bufnr(a:cmd)
+      let bufnum = bufnr('#')
       if bufnum == -1
         echom "E23: No alternate file (error simulated by bufkill.vim)"
         return
@@ -496,8 +506,9 @@ function! <SID>GotoBuffer(cmd) "{{{1
     " Reset lastCmd since didn't work
     let w:BufKillLastCmd = ''
     echom 'BufKill: already at the limit of the BufKill list'
+    " Leave cmd empty to do nothing
   else
-    let cmd = 'b' . newBuffer . "|call cursor(line('.')," . newColumn . ')'
+    let cmd = 'b' . a:bang . newBuffer . "|call cursor(line('.')," . newColumn . ')'
   endif
   exec cmd
 
@@ -519,7 +530,7 @@ function! <SID>UpdateList(event) "{{{1
   endif
   let bufferNum = bufnr('%')
 
-  if (w:BufKillLastCmd=='bufchange')
+  if (w:BufKillLastCmd=~'bufchange')
     " When stepping through files, the w:BufKillList should not be changed
     " here, only by the GotoBuffer command since the files must already
     " exist in the list to jump to them.
