@@ -203,7 +203,7 @@ call s:Debug(2, 'g:BufKillCommandPrefix')
 "
 function! <SID>CreateUniqueCommand(lhs, rhs)
   let command = g:BufKillCommandPrefix.a:lhs
-  if !exists(':'.command)
+  if exists(':'.command) < 2
     exe 'command -bang '.command.' '.a:rhs
   endif
 endfunction
