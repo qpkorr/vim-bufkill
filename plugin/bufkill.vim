@@ -1,7 +1,7 @@
 " bufkill.vim
 " Maintainer:	John Orr (john undersc0re orr yah00 c0m)
-" Version:	1.10
-" Last Change:	16 June 2011
+" Version:	1.11
+" Last Change:	11 December 2012
 
 " Introduction: {{{1
 " Basic Usage:
@@ -44,6 +44,9 @@
 " updating to new versions of this script won't affect your settings.
 
 " Credits:
+" David Emett - for some major bug fixes and logic improvements.
+"               (I'm still most impressed you understood the thing)
+" D Barsam, and others, for suggestions about optional mappings and commands.
 " Dimitar Dimitrov - for improvements in mappings and robustness
 " A few people who pointed out bugs I'd fixed but not made public.
 " Magnus Thor Torfason - for improvements relating to the 'confirm' setting.
@@ -60,13 +63,11 @@
 "   in order to have them preserved by session saving/restoring commands,
 "   and then restore the globals to window variables with another function.
 "
-" - Add a mode (or duplicate to a new script) to save 'views' - where a view
-"   is being at a particular place in a particular file, arrived at via
-"   a buffer switch, gf or tag jump.  Allow jumping back to the previous
-"   view, and kill (delete, wipe) the file when jumping back past the
-"   last view in that file.
-
 " Changelog:
+" 1.11 - Major bug fixes by David Emett, especially relating to
+"        the creation of new buffers when the last buffer is killed.
+"        Also improved restoring of column on console vim.
+"        Key mappings can be disabled by setting g:BufKillCreateMappings to 0
 " 1.10 - Various fixes, eg relating to quicklists
 " 1.9  - Remove unnecessary mapping delays, and a debug message
 " 1.8  - Improved mapping handling, and robustness
@@ -111,17 +112,6 @@ let loaded_bufkill = 1
 " The following variables can be set in your .vimrc/_vimrc file to override
 " those in this file, such that upgrades to the script won't require you to
 " re-edit these variables.
-
-" g:BufKillCommandWhenLastBufferKilled {{{2
-" When you kill the last buffer that has appeared in a window, something
-" has to be displayed if we are to avoid closing the window.  Provide the
-" command to be run at this time in this variable.  The default is 'enew',
-" meaning that a blank window will be show, with an empty, 'No File' buffer.
-" If this parameter is not set to something valid which changes the buffer
-" displayed in the window, the window may be closed.
-if !exists('g:BufKillCommandWhenLastBufferKilled')
-  let g:BufKillCommandWhenLastBufferKilled = 'enew'
-endif
 
 " g:BufKillActionWhenBufferDisplayedInAnotherWindow {{{2
 " If the buffer you are attempting to kill in one window is also displayed
@@ -182,73 +172,82 @@ if !exists('g:BufKillVerbose')
   let g:BufKillVerbose = 1
 endif
 
+" g:BufKillCreateMappings {{{2
+" If set to 1, creates the various mapleader-based mappings.  By default this
+" is set to 1 ('true') but users may want to set to 0 ('false') in order to
+" define their own mappings or to fix a mapping conflict with another plugin.
+if !exists('g:BufKillCreateMappings')
+  let g:BufKillCreateMappings = 1
+endif
+
+" g:BufKillCommandPrefix {{{2
+" A string that will act as the prefix to all BufKill user commands.  The
+" string must adhere to the user command guidelines established in the vim
+" help (see :help user-commands).  By default this is set to 'B' but users
+" may want to change this in order to define their own commands or to fix
+" a command conflict with another plugin.
+if !exists('g:BufKillCommandPrefix')
+  let g:BufKillCommandPrefix = 'B'
+endif
 
 " Commands {{{1
 "
-if !exists(':BA')
-  command -bang BA    :call <SID>GotoBuffer('#',"<bang>")
-endif
-if !exists(':BB')
-  command -bang BB    :call <SID>GotoBuffer('bufback',"<bang>")
-endif
-if !exists(':BF')
-  command -bang BF    :call <SID>GotoBuffer('bufforward',"<bang>")
-endif
-if !exists(':BD')
-  command -bang BD    :call <SID>BufKill('bd',"<bang>")
-endif
-if !exists(':BUN')
-  command -bang BUN   :call <SID>BufKill('bun',"<bang>")
-endif
-if !exists(':BD')
-  command -bang BD    :call <SID>BufKill('bd',"<bang>")
-endif
-if !exists(':BW')
-  command -bang BW    :call <SID>BufKill('bw',"<bang>")
-endif
-if !exists(':BUNDO')
-  command -bang BUNDO :call <SID>UndoKill()
-endif
+function! <SID>CreateUniqueCommand(lhs, rhs)
+  let command = g:BufKillCommandPrefix.a:lhs
+  if !exists(':'.command)
+    exe 'command -bang '.command.' '.a:rhs
+  endif
+endfunction
+call <SID>CreateUniqueCommand('A'   , ':call <SID>GotoBuffer(''#'',"<bang>")')
+call <SID>CreateUniqueCommand('B'   , ':call <SID>GotoBuffer(''bufback'',"<bang>")')
+call <SID>CreateUniqueCommand('F'   , ':call <SID>GotoBuffer(''bufforward'',"<bang>")')
+call <SID>CreateUniqueCommand('D'   , ':call <SID>BufKill(''bd'',"<bang>")')
+call <SID>CreateUniqueCommand('UN'  , ':call <SID>BufKill(''bun'',"<bang>")')
+call <SID>CreateUniqueCommand('D'   , ':call <SID>BufKill(''bd'',"<bang>")')
+call <SID>CreateUniqueCommand('W'   , ':call <SID>BufKill(''bw'',"<bang>")')
+call <SID>CreateUniqueCommand('UNDO', ':call <SID>UndoKill()')
 
 " Keyboard mappings {{{1
 "
-noremap <Plug>BufKillAlt         :call <SID>GotoBuffer('#', '')<CR>
-noremap <Plug>BufKillBangAlt     :call <SID>GotoBuffer('#', '!')<CR>
-noremap <Plug>BufKillBack        :call <SID>GotoBuffer('bufback', '')<CR>
-noremap <Plug>BufKillBangBack    :call <SID>GotoBuffer('bufback', '!')<CR>
-noremap <Plug>BufKillForward     :call <SID>GotoBuffer('bufforward', '')<CR>
-noremap <Plug>BufKillBangForward :call <SID>GotoBuffer('bufforward', '!')<CR>
-noremap <Plug>BufKillBun         :call <SID>BufKill('bun', '')<CR>
-noremap <Plug>BufKillBangBun     :call <SID>BufKill('bun', '!')<CR>
-noremap <Plug>BufKillBd          :call <SID>BufKill('bd', '')<CR>
-noremap <Plug>BufKillBangBd      :call <SID>BufKill('bd', '!')<CR>
-noremap <Plug>BufKillBw          :call <SID>BufKill('bw', '')<CR>
-noremap <Plug>BufKillBangBw      :call <SID>BufKill('bw', '!')<CR>
-noremap <Plug>BufKillUndo        :call <SID>UndoKill()<CR>
+if g:BufKillCreateMappings == 1
+  noremap <Plug>BufKillAlt         :call <SID>GotoBuffer('#', '')<CR>
+  noremap <Plug>BufKillBangAlt     :call <SID>GotoBuffer('#', '!')<CR>
+  noremap <Plug>BufKillBack        :call <SID>GotoBuffer('bufback', '')<CR>
+  noremap <Plug>BufKillBangBack    :call <SID>GotoBuffer('bufback', '!')<CR>
+  noremap <Plug>BufKillForward     :call <SID>GotoBuffer('bufforward', '')<CR>
+  noremap <Plug>BufKillBangForward :call <SID>GotoBuffer('bufforward', '!')<CR>
+  noremap <Plug>BufKillBun         :call <SID>BufKill('bun', '')<CR>
+  noremap <Plug>BufKillBangBun     :call <SID>BufKill('bun', '!')<CR>
+  noremap <Plug>BufKillBd          :call <SID>BufKill('bd', '')<CR>
+  noremap <Plug>BufKillBangBd      :call <SID>BufKill('bd', '!')<CR>
+  noremap <Plug>BufKillBw          :call <SID>BufKill('bw', '')<CR>
+  noremap <Plug>BufKillBangBw      :call <SID>BufKill('bw', '!')<CR>
+  noremap <Plug>BufKillUndo        :call <SID>UndoKill()<CR>
 
-function! <SID>CreateUniqueMapping(lhs, rhs, ...)
-  if hasmapto(a:rhs) && !(a:0 == 1 && a:1 == 'AllowDuplicate')
-    " The user appears to have defined an alternate mapping for this command
-    return
-  elseif maparg(a:lhs, 'n') != ""
-    " The user appears to have defined a mapping for a:lhs already
-    return
+  function! <SID>CreateUniqueMapping(lhs, rhs, ...)
+    if hasmapto(a:rhs) && !(a:0 == 1 && a:1 == 'AllowDuplicate')
+      " The user appears to have defined an alternate mapping for this command
+      return
+    elseif maparg(a:lhs, 'n') != ""
+      " The user appears to have defined a mapping for a:lhs already
+      return
+    endif
+    exec 'nmap <silent> <unique> '.a:lhs.' '.a:rhs
+  endfunction
+
+  call <SID>CreateUniqueMapping('<Leader>bb',   '<Plug>BufKillBack')
+  call <SID>CreateUniqueMapping('<Leader>bf',   '<Plug>BufKillForward')
+  call <SID>CreateUniqueMapping('<Leader>bun',  '<Plug>BufKillBun')
+  call <SID>CreateUniqueMapping('<Leader>!bun', '<Plug>BufKillBangBun')
+  call <SID>CreateUniqueMapping('<Leader>bd',   '<Plug>BufKillBd')
+  call <SID>CreateUniqueMapping('<Leader>!bd',  '<Plug>BufKillBangBd')
+  call <SID>CreateUniqueMapping('<Leader>bw',   '<Plug>BufKillBw')
+  call <SID>CreateUniqueMapping('<Leader>!bw',  '<Plug>BufKillBangBw')
+  call <SID>CreateUniqueMapping('<Leader>bundo','<Plug>BufKillUndo')
+  call <SID>CreateUniqueMapping('<Leader>ba',   '<Plug>BufKillAlt')
+  if g:BufKillOverrideCtrlCaret == 1
+    call <SID>CreateUniqueMapping('<C-^>', '<Plug>BufKillAlt', 'AllowDuplicate')
   endif
-  exec 'nmap <silent> <unique> '.a:lhs.' '.a:rhs
-endfunction
-
-call <SID>CreateUniqueMapping('<Leader>bb',   '<Plug>BufKillBack')
-call <SID>CreateUniqueMapping('<Leader>bf',   '<Plug>BufKillForward')
-call <SID>CreateUniqueMapping('<Leader>bun',  '<Plug>BufKillBun')
-call <SID>CreateUniqueMapping('<Leader>!bun', '<Plug>BufKillBangBun')
-call <SID>CreateUniqueMapping('<Leader>bd',   '<Plug>BufKillBd')
-call <SID>CreateUniqueMapping('<Leader>!bd',  '<Plug>BufKillBangBd')
-call <SID>CreateUniqueMapping('<Leader>bw',   '<Plug>BufKillBw')
-call <SID>CreateUniqueMapping('<Leader>!bw',  '<Plug>BufKillBangBw')
-call <SID>CreateUniqueMapping('<Leader>bundo','<Plug>BufKillUndo')
-call <SID>CreateUniqueMapping('<Leader>ba',   '<Plug>BufKillAlt')
-if g:BufKillOverrideCtrlCaret == 1
-  call <SID>CreateUniqueMapping('<C-^>', '<Plug>BufKillAlt', 'AllowDuplicate')
 endif
 
 function! <SID>BufKill(cmd, bang) "{{{1
@@ -265,20 +264,6 @@ function! <SID>BufKill(cmd, bang) "{{{1
   let s:BufKillBufferToKill = bufnr('%')
   let s:BufKillBufferToKillPath = expand('%:p')
 
-  " If the buffer is already '[No File]' then doing enew won't create a new
-  " buffer, hence the bd/bw command will kill the current buffer and take
-  " the window with it... so check for this case
-  " However - if it's a scratch buffer with text enew should create a new
-  " buffer, so don't return if it is a scratch buffer
-  if bufname('%') == '' && ! &modified && &modifiable
-    " No buffer to kill, ensure not scratch buffer
-    if &buftype == 'nofile' && &swapfile == 0
-      " Is scratch buffer, keep processing
-    else
-      return
-    endif
-  endif
-
   " Just to make sure, check that this matches the buffer currently pointer to
   " by w:BufKillIndex - else I've stuffed up
   if s:BufKillBufferToKill != w:BufKillList[w:BufKillIndex]
@@ -287,7 +272,7 @@ function! <SID>BufKill(cmd, bang) "{{{1
   endif
 
   " If the buffer is modified, and a:bang is not set, give the same kind of
-  " error (or confirmation) as normal bw/bd
+  " error (or confirmation) as normal bun/bw/bd
   if &modified && strlen(a:bang) == 0
     if exists('g:BufKillActionWhenModifiedFileToBeKilled')
       let s:BufKillActionWhenModifiedFileToBeKilled = g:BufKillActionWhenModifiedFileToBeKilled
@@ -394,24 +379,65 @@ function! <SID>BufKill(cmd, bang) "{{{1
   if bufexists(s:BufKillBufferToKill)
     let killCmd = a:cmd . a:bang . s:BufKillBufferToKill
     exec killCmd
-  else
   endif
 
+  " Restore position if saved.  Needed on console vim, at least, to restore correct column
+  call <SID>RestoreView()
+
+endfunction
+
+function! <SID>IsBufferNew(buf) "{{{1
+  return (bufname(a:buf) == '') && !getbufvar(a:buf, '&modified')
+endfunction
+
+function! <SID>SwitchToNewBuffer(bang) "{{1
+  let old_bufnum = bufnr('%')
+
+  " if we already have a "new" buffer, switch to it
+  for bufnum in range(1, bufnr('$'))
+    if bufexists(bufnum) && <SID>IsBufferNew(bufnum) && (bufnum != old_bufnum)
+      exec 'b' . a:bang . bufnum
+      return
+    endif
+  endfor
+
+  " try to create a new buffer
+  exec 'enew' . a:bang
+  if bufnr('%') != old_bufnum
+    return
+  endif
+
+  " sometimes vim doesn't bother creating a new buffer, eg if you do two enews
+  " in a row. it's possible to workaround this by modifying the current buffer
+  " before doing the enew...
+  let &modifiable = 1
+  normal! iforce enew to create a new buffer
+  enew!
+  let new_bufnum = bufnr('%')
+  exec 'b' . old_bufnum
+  silent normal! u
+  exec 'b' . new_bufnum
 endfunction
 
 function! <SID>GotoBuffer(cmd, bang) "{{{1
   "Function to display the previous buffer for the specified window
   " a:cmd is one of
-  "     bw - Wiping the current buffer
+  "     bun - Unloading the current buffer
   "     bd - Deleting the current buffer
+  "     bw - Wiping the current buffer
   "     bufback - stepping back through the list
   "     bufforward - stepping forward through the list
   "     # - swap to alternate buffer, if one exists. Use this instead of
   "         Ctrl-^, in order to swap to the previous column of the alternate
   "         file, which does not happen with regular Ctrl-^.
 
-  if (a:cmd=='bw' || a:cmd=='bd')
-    let w:BufKillLastCmd = a:cmd . a:bang
+  if (a:cmd=='bun' || a:cmd=='bd' || a:cmd=='bw')
+    let killing = 1
+  else
+    let killing = 0
+  endif
+
+  if killing
     " Handle the 'auto' setting for
     " g:BufKillFunctionSelectingValidBuffersToDisplay
     let validityFunction = g:BufKillFunctionSelectingValidBuffersToDisplay
@@ -433,7 +459,6 @@ function! <SID>GotoBuffer(cmd, bang) "{{{1
     endif
     let w:BufKillIndex -= 1
   else
-    let w:BufKillLastCmd = 'bufchange'
     " Should only be used with undeleted (and unwiped) buffers
     let validityFunction = 'buflisted'
 
@@ -447,13 +472,9 @@ function! <SID>GotoBuffer(cmd, bang) "{{{1
         echom "E23: No alternate file (error simulated by bufkill.vim)"
         return
       endif
-      if bufnum == bufnr('.')
+      if bufnum == bufnr('%')
         " If the alternate buffer is also the current buffer, do nothing
-        " Update: I've seen cases (vim 7.2.411) where we end up here, though
-        " :ls suggests bufnr('.') is returning the wrong value.  So allow
-        " the command to proceed...
-        echom "bufkill: bufnr('#')=".bufnr('#')." and bufnr('.')=".bufnr('.')." - trying anyway"
-        " return
+        return
       elseif !buflisted(bufnum)
         " Vim just ignores the command in this case, so we'll do likewise
         " Update: it seems it no longer ignores the command in this case
@@ -469,48 +490,54 @@ function! <SID>GotoBuffer(cmd, bang) "{{{1
     endif
   endif
 
-  " Find the most recent buffer to display
-  if w:BufKillIndex < 0 || w:BufKillIndex >= len(w:BufKillList)
-    let newBuffer = -1
-  else
+  while 1
+    if w:BufKillIndex < 0
+      let w:BufKillIndex = 0
+    elseif w:BufKillIndex > (len(w:BufKillList) - 1)
+      let w:BufKillIndex = len(w:BufKillList) - 1
+    endif
+
+    if w:BufKillList[w:BufKillIndex] == bufnr('%')
+      if !killing
+        echom 'BufKill: already at the limit of the BufKill list'
+        return
+      endif
+
+      " we're going to kill the current buffer -- we want to switch to a
+      " different one...
+      if w:BufKillIndex == 0
+        if len(w:BufKillList) == 1
+          " there are no other buffers in our list. switch to a "new" one
+          call <SID>SwitchToNewBuffer(a:bang)
+          call <SID>SaveView()
+          return
+        endif
+        let w:BufKillIndex += 1
+      else
+        let w:BuffKillIndex -= 1
+      endif
+    endif
+
     let newBuffer = w:BufKillList[w:BufKillIndex]
     let newColumn = w:BufKillColumnList[w:BufKillIndex]
-    exec 'let validityResult = '.validityFunction.'(newBuffer)'
-    while !validityResult
-      call remove(w:BufKillList, w:BufKillIndex)
-      call remove(w:BufKillColumnList, w:BufKillIndex)
-      if a:cmd != 'bufforward'
-        let w:BufKillIndex -= 1
-        " No change needed for bufforward since we just deleted the element
-        " being pointed to, so effectively, we moved forward one spot
-      endif
-      if w:BufKillIndex < 0 || w:BufKillIndex >= len(w:BufKillList)
-        let newBuffer = -1
-        break
-      endif
-      let newBuffer = w:BufKillList[w:BufKillIndex]
-      let newColumn = w:BufKillColumnList[w:BufKillIndex]
-      exec 'let validityResult = '.validityFunction.'(newBuffer)'
-    endwhile
-  endif
 
-  " Handle the case of no valid buffer number to display
-  let cmd = ''
-  if newBuffer == -1
-    " Ensure index is meaningful
-    if a:cmd == 'bufforward'
-      let w:BufKillIndex = len(w:BufKillList) - 1
-    else
-      let w:BufKillIndex = 0
+    exec 'let validityResult = '.validityFunction.'(newBuffer)'
+    if validityResult
+      " buffer is valid: switch to it...
+      exec 'b' . a:bang . newBuffer . "|call cursor(line('.')," . newColumn . ')'
+      call <SID>SaveView()
+      return
     endif
-    " Reset lastCmd since didn't work
-    let w:BufKillLastCmd = ''
-    echom 'BufKill: already at the limit of the BufKill list'
-    " Leave cmd empty to do nothing
-  else
-    let cmd = 'b' . a:bang . newBuffer . "|call cursor(line('.')," . newColumn . ')'
-  endif
-  exec cmd
+
+    " buffer isn't valid: remove it from the list
+    call remove(w:BufKillList, w:BufKillIndex)
+    call remove(w:BufKillColumnList, w:BufKillIndex)
+    if a:cmd != 'bufforward'
+      let w:BufKillIndex -= 1
+      " No change needed for bufforward since we just deleted the element
+      " being pointed to, so effectively, we moved forward one spot
+    endif
+  endwhile
 
 endfunction   " GotoBuffer
 
@@ -525,16 +552,9 @@ function! <SID>UpdateList(event) "{{{1
   if !exists('w:BufKillIndex')
     let w:BufKillIndex = -1
   endif
-  if !exists('w:BufKillLastCmd')
-    let w:BufKillLastCmd = ''
-  endif
   let bufferNum = bufnr('%')
 
-  if (w:BufKillLastCmd=~'bufchange')
-    " When stepping through files, the w:BufKillList should not be changed
-    " here, only by the GotoBuffer command since the files must already
-    " exist in the list to jump to them.
-  else
+  if (w:BufKillIndex == -1) || (w:BufKillList[w:BufKillIndex] != bufferNum)
     " Increment index
     let w:BufKillIndex += 1
     if w:BufKillIndex < len(w:BufKillList)
@@ -557,9 +577,6 @@ function! <SID>UpdateList(event) "{{{1
     " Now add the buffer to the list, at the end
     let w:BufKillList += [bufferNum]
   endif
-
-  " Reset since command processed
-  let w:BufKillLastCmd = ''
 
 endfunction   " UpdateList
 
@@ -623,13 +640,33 @@ function! <SID>RestoreWindowPos() "{{{1
   exec 'normal! ' . s:BufKillWindowPos . 'w'
 endfunction
 
+function! <SID>SaveView() "{{{1
+  " Function to save the current view to w:BufKillSavedView.  This has been
+  " found necessary on console vim in particular, in order return to the
+  " correct column when killing a file.
+  if exists("*winsaveview")
+    let w:BufKillSavedView = winsaveview()
+  else
+  endif
+endfunction   " SaveView
+
+function! <SID>RestoreView() "{{{1
+  " Matching restore function to SaveView
+  if exists("*winrestview") && exists('w:BufKillSavedView')
+    call winrestview(w:BufKillSavedView)
+    unlet w:BufKillSavedView
+  endif
+endfunction   " RestoreView
+
 " Autocommands {{{1
 "
 augroup BufKill
+autocmd!
 autocmd BufKill WinEnter * call <SID>UpdateList('WinEnter')
 autocmd BufKill BufEnter * call <SID>UpdateList('BufEnter')
 autocmd BufKill WinLeave * call <SID>UpdateLastColumn('WinLeave')
 autocmd BufKill BufLeave * call <SID>UpdateLastColumn('BufLeave')
+augroup END
 
 " Cleanup and modelines {{{1
 let &cpo = s:save_cpo
