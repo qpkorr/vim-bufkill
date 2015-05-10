@@ -1,47 +1,7 @@
 " bufkill.vim
 " Maintainer:	John Orr (john undersc0re orr yah00 c0m)
-" Version:	1.11
-" Last Change:	11 December 2012
-
-" Introduction: {{{1
-" Basic Usage:
-" When you want to unload/delete/wipe a buffer, use:
-"   :bun/:bd/:bw to close the window as well (vim command), or
-"   :BUN/:BD/:BW to leave the window intact (this script).
-" To move backwards/forwards through recently accessed buffers, use:
-"   :BB/:BF
-" To move to the alternate buffer whilst preserving cursor column, use:
-"   :BA
-" or override Ctrl-^ via g:BufKillOverrideCtrlCaret
-" Mappings are also defined.
-
-" Description:
-" This is a script to
-" a) unload, delete or wipe a buffer without closing the window it was displayed in
-" b) in its place, display the buffer most recently used in the window, prior
-"    to the buffer being killed.  This selection is taken from the full list of
-"    buffers ever displayed in the particular window.
-" c) allow one level of undo in case you kill a buffer then change your mind
-" d) allow navigation through recently accessed buffers, without closing them.
-" e) override the standard Ctrl-^ (Ctrl-6) functionality to maintain the
-"    correct cursor column position. (Enable via g:BufKillOverrideCtrlCaret)
-"
-" The inspiration for this script came from
-" a) my own frustration with vim's lack of this functionality
-" b) the description of the emacs kill-buffer command in tip #622
-"    (this script basically duplicates this command I believe,
-"    not sure about the undo functionality)
-" c) comments by Keith Roberts when the issue was raised in the
-"    vim@vim.org mailing list.
-
-" Install Details:
-" Drop this file into your $HOME/.vim/plugin directory (unix)
-" or $HOME/vimfiles/plugin directory (Windows), etc.
-" Use the commands/mappings defined below to invoke the functionality
-" (or redefine them elsewhere to what you want), and set the
-" User Configurable Variables as desired.  You should be able to make
-" any customisations to the controls in your vimrc file, such that
-" updating to new versions of this script won't affect your settings.
+" Version:	1.12
+" Last Change:	10 May 2015
 
 " Credits:
 " David Emett - for some major bug fixes and logic improvements.
@@ -64,6 +24,7 @@
 "   and then restore the globals to window variables with another function.
 "
 " Changelog:
+" 1.12 - Convert to bundle format prior to uploading to github
 " 1.11 - Major bug fixes by David Emett, especially relating to
 "        the creation of new buffers when the last buffer is killed.
 "        Also improved restoring of column on console vim.
@@ -103,10 +64,52 @@ if v:version < 700
 endif
 
 if exists("loaded_bufkill")
+  if !exists('g:Debug')
   finish
+  endif " Debug
 endif
 let loaded_bufkill = 1
 
+function! s:Debug(level, ...) "{{{1
+  " Arguments: First argument is always a level value                                (Debug)
+  " Subsequent arguments can be any type.                                            (Debug)
+  " If they are a string, and that string represents the name of a global            (Debug)
+  " variable, the variable name, and it's value, will be printed.                    (Debug)
+  " Lists and dictionaries should be handled.                                        (Debug)
+  if !exists('g:Debug') || g:Debug < a:level                                       " (Debug)
+    return " (Debug) "
+  endif                                                                            " (Debug)
+                                                                                   " (Debug)
+  let s = ''                                                                       " (Debug)
+  let i = 1                                                                        " (Debug)
+  while i <= a:0                                                                   " (Debug)
+    if exists('DebugArg')                                                          " (Debug)
+      unlet DebugArg                                                               " (Debug)
+    endif                                                                          " (Debug)
+    exec "let DebugArg = a:" . i
+    let argType = type(DebugArg)                                                   " (Debug)
+    if argType == 1  " String                                                        (Debug)
+      " String may be a variable name, in which case we print the name first         (Debug)
+      if exists(DebugArg)                                                          " (Debug)
+        " The string is indeed the name of a variable                                (Debug)
+        " Get the name of the variable, then set DebugArg to the value of that variable
+        let s = s . DebugArg . " = "                                               " (Debug)
+        exec 'let arg2 = ' . DebugArg
+        unlet DebugArg                                                             " (Debug)
+        let DebugArg = arg2   " Necessary to change the type of DebugArg             (Debug)
+      endif                                                                        " (Debug)
+    endif                                                                          " (Debug)
+    " Now print the value itself                                                     (Debug)
+    let s = s . VarToString(DebugArg)                                              " (Debug)
+    if i < a:0                                                                     " (Debug)
+      let s = s . ', '                                                             " (Debug)
+    endif                                                                          " (Debug)
+    let i = i + 1                                                                  " (Debug)
+  endwhile                                                                         " (Debug)
+  autocmd! CursorHold * echom '--------- Debug ---------'
+  let g:DebugEcho = 'echom'
+  exec g:DebugEcho . ' s'
+endfunction                                                                        " (Debug)
 
 " User configurable variables {{{1
 " The following variables can be set in your .vimrc/_vimrc file to override
@@ -126,6 +129,7 @@ let loaded_bufkill = 1
 if !exists('g:BufKillActionWhenBufferDisplayedInAnotherWindow')
   let g:BufKillActionWhenBufferDisplayedInAnotherWindow = 'confirm'
 endif
+call s:Debug(2, 'g:BufKillActionWhenBufferDisplayedInAnotherWindow')
 
 " g:BufKillFunctionSelectingValidBuffersToDisplay {{{2
 " When a buffer is removed from a window, the script finds the previous
@@ -143,6 +147,7 @@ endif
 if !exists('g:BufKillFunctionSelectingValidBuffersToDisplay')
   let g:BufKillFunctionSelectingValidBuffersToDisplay = 'buflisted'
 endif
+call s:Debug(2, 'g:BufKillFunctionSelectingValidBuffersToDisplay')
 
 " g:BufKillActionWhenModifiedFileToBeKilled {{{2
 " When a request is made to kill (wipe, delete, or unload) a modified buffer
@@ -164,6 +169,7 @@ endif
 if !exists('g:BufKillOverrideCtrlCaret')
   let g:BufKillOverrideCtrlCaret = 0
 endif
+call s:Debug(2, 'g:BufKillOverrideCtrlCaret')
 
 " g:BufKillVerbose {{{2
 " If set to 1, prints extra info about what's being done, why, and how to
@@ -171,6 +177,7 @@ endif
 if !exists('g:BufKillVerbose')
   let g:BufKillVerbose = 1
 endif
+call s:Debug(2, 'g:BufKillVerbose')
 
 " g:BufKillCreateMappings {{{2
 " If set to 1, creates the various mapleader-based mappings.  By default this
@@ -179,6 +186,7 @@ endif
 if !exists('g:BufKillCreateMappings')
   let g:BufKillCreateMappings = 1
 endif
+call s:Debug(2, 'g:BufKillCreateMappings')
 
 " g:BufKillCommandPrefix {{{2
 " A string that will act as the prefix to all BufKill user commands.  The
@@ -189,6 +197,7 @@ endif
 if !exists('g:BufKillCommandPrefix')
   let g:BufKillCommandPrefix = 'B'
 endif
+call s:Debug(2, 'g:BufKillCommandPrefix')
 
 " Commands {{{1
 "
@@ -252,17 +261,21 @@ endif
 
 function! <SID>BufKill(cmd, bang) "{{{1
 " The main function that sparks the buffer change/removal
+  let DebugF = 'BufKill'
+  call s:Debug(1, DebugF, a:cmd, a:bang)
   if !exists('w:BufKillList')
     echoe "BufKill Error: array w:BufKillList does not exist!"
     echoe "Restart vim and retry, and if problems persist, notify the author!"
     return
   endif
+  call s:Debug(2, DebugF, 'w:BufKillList')
 
   call <SID>SaveWindowPos()
 
   " Get the buffer to delete - the current one obviously
   let s:BufKillBufferToKill = bufnr('%')
   let s:BufKillBufferToKillPath = expand('%:p')
+  call s:Debug(2, DebugF, 's:BufKillBufferToKill')
 
   " Just to make sure, check that this matches the buffer currently pointer to
   " by w:BufKillIndex - else I've stuffed up
@@ -323,10 +336,12 @@ function! <SID>BufKill(cmd, bang) "{{{1
   while buf != -1
     if buf == s:BufKillBufferToKill
       let s:BufKillWindowListWithBufferLoaded += [i]
+      call s:Debug(2, DebugF, 'Added window ' . i . ' to', 's:BufKillWindowListWithBufferLoaded')
     endif
     let i = i + 1
     let buf = winbufnr(i)
   endwhile
+  call s:Debug(2, DebugF, 's:BufKillWindowListWithBufferLoaded')
 
   " Handle the case where the buffer is displayed in multiple windows
   if len(s:BufKillWindowListWithBufferLoaded) > 1 && strlen(a:bang) == 0
@@ -352,10 +367,13 @@ function! <SID>BufKill(cmd, bang) "{{{1
   let i = 0
   while i < len(s:BufKillWindowListWithBufferLoaded)
     let win = s:BufKillWindowListWithBufferLoaded[i]
+    call s:Debug(2, DebugF, 'Got window ' . win . ' from', 's:BufKillWindowListWithBufferLoaded', 'position ' . i)
 
     " Go to the right window in which to perform the action
     if win > 0
+      call s:Debug(2, DebugF, 'Goto window ' . win)
       exec 'normal! ' . win . 'w'
+      call s:Debug(2, DebugF, 'Current window ' . winnr())
     endif
 
     " Go to the previous buffer for this window
@@ -378,12 +396,16 @@ function! <SID>BufKill(cmd, bang) "{{{1
   " window.  Thus we must check before deleting.
   if bufexists(s:BufKillBufferToKill)
     let killCmd = a:cmd . a:bang . s:BufKillBufferToKill
+    call s:Debug(2, DebugF, 'killCmd = ' . killCmd)
     exec killCmd
+  else " Debug
+    call s:Debug(2, DebugF, 'buffer #'.s:BufKillBufferToKill.' removed during GotoBuffer step')
   endif
 
   " Restore position if saved.  Needed on console vim, at least, to restore correct column
   call <SID>RestoreView()
 
+  call s:Debug(2, DebugF, 'Exiting')
 endfunction
 
 function! <SID>IsBufferNew(buf) "{{{1
@@ -430,6 +452,11 @@ function! <SID>GotoBuffer(cmd, bang) "{{{1
   "     # - swap to alternate buffer, if one exists. Use this instead of
   "         Ctrl-^, in order to swap to the previous column of the alternate
   "         file, which does not happen with regular Ctrl-^.
+  let DebugF = 'GotoBuffer'
+  call s:Debug(1, DebugF, a:cmd)
+  call s:Debug(2, DebugF, 'w:BufKillList')
+  call s:Debug(2, DebugF, 'w:BufKillColumnList')
+  call s:Debug(2, DebugF, 'w:BufKillIndex')
 
   if (a:cmd=='bun' || a:cmd=='bd' || a:cmd=='bw')
     let killing = 1
@@ -521,6 +548,7 @@ function! <SID>GotoBuffer(cmd, bang) "{{{1
     let newBuffer = w:BufKillList[w:BufKillIndex]
     let newColumn = w:BufKillColumnList[w:BufKillIndex]
 
+    call s:Debug(2, DebugF, 'newBuffer = ' . newBuffer . ', newColumn = ' . newColumn)
     exec 'let validityResult = '.validityFunction.'(newBuffer)'
     if validityResult
       " buffer is valid: switch to it...
@@ -539,10 +567,17 @@ function! <SID>GotoBuffer(cmd, bang) "{{{1
     endif
   endwhile
 
+  call s:Debug(2, DebugF, 'w:BufKillList')
+  call s:Debug(2, DebugF, 'w:BufKillColumnList')
+  call s:Debug(2, DebugF, 'w:BufKillIndex')
+  call s:Debug(2, DebugF, 'Exiting')
+  " redraw  " To hide call Debug messages for now!
 endfunction   " GotoBuffer
 
 function! <SID>UpdateList(event) "{{{1
   " Function to update the window list with info about the current buffer
+  let DebugF = 'UpdateList'
+  call s:Debug(1, DebugF, 'Entering(' . a:event . '): win = ' . winnr() . ', buf = ' . bufnr('%') . ' (' . bufname('%') . ')')
   if !exists('w:BufKillList')
     let w:BufKillList = []
   endif
@@ -552,6 +587,9 @@ function! <SID>UpdateList(event) "{{{1
   if !exists('w:BufKillIndex')
     let w:BufKillIndex = -1
   endif
+  call s:Debug(2, DebugF, 'w:BufKillList')
+  call s:Debug(2, DebugF, 'w:BufKillColumnList')
+  call s:Debug(2, DebugF, 'w:BufKillIndex')
   let bufferNum = bufnr('%')
 
   if (w:BufKillIndex == -1) || (w:BufKillList[w:BufKillIndex] != bufferNum)
@@ -578,10 +616,20 @@ function! <SID>UpdateList(event) "{{{1
     let w:BufKillList += [bufferNum]
   endif
 
+  call s:Debug(2, DebugF, 'w:BufKillList')
+  call s:Debug(2, DebugF, 'w:BufKillColumnList')
+  call s:Debug(2, DebugF, 'w:BufKillIndex')
+  call s:Debug(1, DebugF, 'Exiting (' . a:event . '): ', 'w:BufKillList')
+  " redraw  " To hide call Debug messages for now!
 endfunction   " UpdateList
 
 function! <SID>UpdateLastColumn(event) "{{{1
   " Function to save the current column and buffer and window numbers,
+  let DebugF = 'UpdateColumnList'
+  call s:Debug(1, DebugF, 'Entering(' . a:event . '): win = ' . winnr() . ', buf = ' . bufnr('%') . ' (' . bufname('%') . ')')
+  call s:Debug(2, DebugF, 'w:BufKillList')
+  call s:Debug(2, DebugF, 'w:BufKillColumnList')
+  call s:Debug(2, DebugF, 'w:BufKillIndex')
   if !exists('w:BufKillList')
     " Just give up for now.
     return
@@ -594,9 +642,16 @@ function! <SID>UpdateLastColumn(event) "{{{1
   else
     echom 'UpdateLastColumn failed to find bufnr ' . bufnr('%') . ' in w:BufKillList'
   endif
+  call s:Debug(2, DebugF, 'w:BufKillList')
+  call s:Debug(2, DebugF, 'w:BufKillColumnList')
+  call s:Debug(2, DebugF, 'w:BufKillIndex')
+  call s:Debug(1, DebugF, 'Exiting (' . a:event . ')')
+  " redraw  " To hide call Debug messages for now!
 endfunction
 
 function! <SID>UndoKill() "{{{1
+  let DebugF = 'UndoKill'
+  call s:Debug(1, DebugF)
 
   if !exists('s:BufKillLastBufferKilledNum') || !exists('s:BufKillLastBufferKilledPath') || s:BufKillLastBufferKilledNum == -1 || s:BufKillLastBufferKilledPath == ''
     echoe 'BufKill: nothing to undo (only one level of undo is supported)'
@@ -617,7 +672,10 @@ function! <SID>UndoKill() "{{{1
     let i = 0
     while i < len(s:BufKillLastWindowListWithBufferLoaded)
       let win = s:BufKillLastWindowListWithBufferLoaded[i]
+      call s:Debug(2, DebugF, 'Got window ' . win . ' from', 's:BufKillLastWindowListWithBufferLoaded', 'position ' . i)
+      call s:Debug(2, DebugF, 'Goto window ' . win)
       exec 'normal! ' . win . 'w'
+      call s:Debug(2, DebugF, 'Current window ' . winnr())
       exec cmd
       let i = i + 1
     endwhile
@@ -627,16 +685,21 @@ function! <SID>UndoKill() "{{{1
     unlet s:BufKillLastBufferKilledPath
     unlet s:BufKillLastWindowListWithBufferLoaded
   endif
+  call s:Debug(2, DebugF, 'Exiting')
 endfunction
 
 function! <SID>SaveWindowPos() "{{{1
   " Save the current window, to be able to come back to it after doing things
   " in other windows
+  let DebugF = 'SaveWindowPos'
   let s:BufKillWindowPos = winnr()
+  call s:Debug(2, DebugF, 'Saving with winnr = ', 's:BufKillWindowPos')
 endfunction
 
 function! <SID>RestoreWindowPos() "{{{1
   " Restore the window from it's saved config variable
+  let DebugF = 'RestoreWindowPos'
+  call s:Debug(2, DebugF, 'Restoring to = ', 's:BufKillWindowPos')
   exec 'normal! ' . s:BufKillWindowPos . 'w'
 endfunction
 
@@ -644,16 +707,21 @@ function! <SID>SaveView() "{{{1
   " Function to save the current view to w:BufKillSavedView.  This has been
   " found necessary on console vim in particular, in order return to the
   " correct column when killing a file.
+  let DebugF = 'SaveView'
   if exists("*winsaveview")
     let w:BufKillSavedView = winsaveview()
+    call s:Debug(2, DebugF, 'SavedView = ', 'w:BufKillSavedView')
   else
+    call s:Debug(1, DebugF, 'winsaveview not in this version of Vim, column not reliably saved.')
   endif
 endfunction   " SaveView
 
 function! <SID>RestoreView() "{{{1
   " Matching restore function to SaveView
+  let DebugF = 'RestoreView'
   if exists("*winrestview") && exists('w:BufKillSavedView')
     call winrestview(w:BufKillSavedView)
+    call s:Debug(2, DebugF, 'Restoring to = ', 'w:BufKillSavedView')
     unlet w:BufKillSavedView
   endif
 endfunction   " RestoreView
