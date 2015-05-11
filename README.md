@@ -1,7 +1,8 @@
 # vim-bufkill
 Git repo for http://www.vim.org/scripts/script.php?script_id=1147
 
-This is the official github repo for the bufkill.vim script on vim.org, and supercedes the above location.
+https://github.com/qpkorr/vim-bufkill is the official github repo for the bufkill.vim 
+script on vim.org, and supercedes the above location.
 
 The repo contains the files suitable for a vim pathogen "bundle" directory (google is your friend).
 
