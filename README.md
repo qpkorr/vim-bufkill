@@ -1,49 +1,77 @@
 # vim-bufkill
-Git repo for http://www.vim.org/scripts/script.php?script_id=1147
 
-https://github.com/qpkorr/vim-bufkill is the official github repo for the bufkill.vim 
-script on vim.org, and supercedes the above location.
+In Vim, trying to unload, delete or wipe a buffer without closing the window or split? You'll like this:
 
-The repo contains the files suitable for a vim pathogen "bundle" directory (google is your friend).
+**With bufkill:**
 
-From renamer.txt, the help file:
-## INTRODUCTION
-Basic Usage:
-When you want to unload/delete/wipe a buffer, use:
-  :bun/:bd/:bw to close the window as well (vim command), or
-  :BUN/:BD/:BW to leave the window intact (this script).
-To move backwards/forwards through recently accessed buffers, use:
-  :BB/:BF
-To move to the alternate buffer whilst preserving cursor column, use:
-  :BA
-or override Ctrl-^ via g:BufKillOverrideCtrlCaret
-Mappings are also defined.
+![With bufkill](http://i59.tinypic.com/2mh6kc6.gif)
 
-## DESCRIPTION
-This is a script to
-a) unload, delete or wipe a buffer without closing the window it was displayed in
-b) in its place, display the buffer most recently used in the window, prior
-   to the buffer being killed.  This selection is taken from the full list of
-   buffers ever displayed in the particular window.
-c) allow one level of undo in case you kill a buffer then change your mind
-d) allow navigation through recently accessed buffers, without closing them.
-e) override the standard Ctrl-^ (Ctrl-6) functionality to maintain the
-   correct cursor column position. (Enable via g:BufKillOverrideCtrlCaret)
+**Without bufkill (standard Vim behaviour):**
 
-The inspiration for this script came from
-a) my own frustration with vim's lack of this functionality
-b) the description of the emacs kill-buffer command in tip #622
-   (this script basically duplicates this command I believe,
-   not sure about the undo functionality)
-c) comments by Keith Roberts when the issue was raised in the
-   vim@vim.org mailing list.
+![Without bufkill](http://i58.tinypic.com/jaweg6.gif)
 
-## INSTALL DETAILS
-The usual pathogen setup - add vim-bufkill directory to $HOME/.vim/bundle
-directory.
+The inspiration for this script came from:
+ * My own frustration with vim's lack of this functionality
+ * The description of the emacs kill-buffer command in tip #622 (this script basically duplicates this command I believe, not sure about the undo functionality)
+ * Comments by Keith Roberts when the issue was raised in the vim@vim.org mailing list.
 
-Use the provided commands/mappings to invoke the functionality
-(or redefine them elsewhere to what you want), and set the
-User Configurable Variables as desired.  You should be able to make
-any customisations to the controls in your vimrc file, such that
-updating to new versions of this script won't affect your settings.
+*Note: This is the official Git repo which replaces http://www.vim.org/scripts/script.php?script_id=1147*
+
+## Installation
+
+This plugin follows the standard runtime path structure, and as such it can be installed with a variety of plugin managers:
+
+  * [Pathogen][1]
+    * `git clone https://github.com/qpkorr/vim-bufkill ~/.vim/bundle/vim-bufkill`
+
+  * [Vundle][2]:
+    * `Plugin 'bling/vim-airline'`
+
+## Usage
+
+#### Unloading/Deleting/Wiping
+
+When you wish to unload a file from the buffer and keep the window/split intact:
+
+`:BUN`
+
+When you wish to delete a file from the buffer and keep the window/split intact:
+
+`:BD`
+
+When you wish to wipe a file from the buffer and keep the window/split intact:
+
+`:BW`
+
+Notice how the key mappings are the uppercase version of the `:bun` `:bd` `:bw` Vim commands? Easy!
+
+#### Moving through buffers
+
+To move backwards through recently accessed buffers:
+
+`:BB`
+
+and to move forwards:
+
+`:BF`
+
+To move to an alternate buffer and keep the cursor in the same column, use:
+
+`:BA`
+
+#### Also...
+
+You can also override `Ctrl-^` (Vim's default for swapping between alternate buffers) via `g:BufKillOverrideCtrlCaret` in your `/.vimrc` file.
+
+You can overide the default mappings within your `/.vimrc` file like so:
+
+`map <C-c> :BD<cr>`
+
+resulting in being able to delete a file from the buffer via vim-bufkill with <kbd>CTRL</kbd> + <kbd>c</kbd>
+
+## Contributions
+
+Contributions and pull requests are welcome.
+
+[1]: https://github.com/tpope/vim-pathogen
+[2]: https://github.com/gmarik/vundle
