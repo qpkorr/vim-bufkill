@@ -73,5 +73,7 @@ resulting in being able to delete a file from the buffer via vim-bufkill with <k
 
 Contributions and pull requests are welcome.
 
+A big thanks to Oli Morris for his excellent rewrite of this README file, and creating the animated gifs.
+
 [1]: https://github.com/tpope/vim-pathogen
 [2]: https://github.com/gmarik/vundle
