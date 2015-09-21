@@ -4,11 +4,11 @@ In Vim, trying to unload, delete or wipe a buffer without closing the window or 
 
 **With bufkill:**
 
-![With bufkill](http://i59.tinypic.com/2mh6kc6.gif)
+![With bufkill](https://cloud.githubusercontent.com/assets/9512444/10005397/00a73482-60af-11e5-9354-fe4c363ea2bf.gif)
 
 **Without bufkill (standard Vim behaviour):**
 
-![Without bufkill](http://i58.tinypic.com/jaweg6.gif)
+![Without bufkill](https://cloud.githubusercontent.com/assets/9512444/10005398/033cf65a-60af-11e5-8a09-04fbca6f316c.gif)
 
 The inspiration for this script came from:
  * My own frustration with vim's lack of this functionality
