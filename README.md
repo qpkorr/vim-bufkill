@@ -25,7 +25,7 @@ This plugin follows the standard runtime path structure, and as such it can be i
     * `git clone https://github.com/qpkorr/vim-bufkill ~/.vim/bundle/vim-bufkill`
 
   * [Vundle][2]:
-    * `Plugin 'bling/vim-airline'`
+    * `Plugin 'qpkorr/vim-bufkill'`
 
 ## Usage
 
