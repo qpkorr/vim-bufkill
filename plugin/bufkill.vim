@@ -24,6 +24,8 @@
 "   and then restore the globals to window variables with another function.
 "
 " Changelog:
+" 1.13 - Improve error message behaviour thanks to louwers@github.
+"        Fix error when debug enabled thanks to nkgm@github and pavoljuhas@github.
 " 1.12 - Convert to bundle format prior to uploading to github
 " 1.11 - Major bug fixes by David Emett, especially relating to
 "        the creation of new buffers when the last buffer is killed.
@@ -100,7 +102,7 @@ function! s:Debug(level, ...) "{{{1
       endif                                                                        " (Debug)
     endif                                                                          " (Debug)
     " Now print the value itself                                                     (Debug)
-    let s = s . VarToString(DebugArg)                                              " (Debug)
+    let s = s . string(DebugArg)                                                   " (Debug)
     if i < a:0                                                                     " (Debug)
       let s = s . ', '                                                             " (Debug)
     endif                                                                          " (Debug)
@@ -297,7 +299,9 @@ function! <SID>BufKill(cmd, bang) "{{{1
       endif
     endif
     if s:BufKillActionWhenModifiedFileToBeKilled =~ '[Ff][Aa][Ii][Ll]'
-      echoe "No write since last change for buffer '" . bufname(s:BufKillBufferToKill) . "' (add ! to override)"
+      echohl ErrorMsg
+      echo "No write since last change for buffer '" . bufname(s:BufKillBufferToKill) . "' (add ! to override)"
+      echohl None
       return
     elseif s:BufKillActionWhenModifiedFileToBeKilled =~ '[Cc][Oo][Nn][Ff][Ii][Rr][Mm]'
       let options = "&Yes\n&No\n&Cancel"
