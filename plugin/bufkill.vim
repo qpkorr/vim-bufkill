@@ -545,7 +545,7 @@ function! <SID>GotoBuffer(cmd, bang) "{{{1
         endif
         let w:BufKillIndex += 1
       else
-        let w:BuffKillIndex -= 1
+        let w:BufKillIndex -= 1
       endif
     endif
 
