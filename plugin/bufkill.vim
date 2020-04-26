@@ -643,8 +643,6 @@ function! <SID>UpdateLastColumn(event) "{{{1
     " Extend list if required, then set the value
     let w:BufKillColumnList += repeat([0], index - len(w:BufKillColumnList) + 1)
     let w:BufKillColumnList[index] = col('.')
-  else
-    echom 'UpdateLastColumn failed to find bufnr ' . bufnr('%') . ' in w:BufKillList'
   endif
   call s:Debug(2, DebugF, 'w:BufKillList')
   call s:Debug(2, DebugF, 'w:BufKillColumnList')
