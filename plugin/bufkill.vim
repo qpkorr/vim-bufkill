@@ -1,9 +1,11 @@
 " bufkill.vim
 " Maintainer:	John Orr (john undersc0re orr yah00 c0m)
-" Version:	1.12
-" Last Change:	10 May 2015
+" Version:	1.14
+" Last Change:	29 Apr 2020
 
 " Credits:
+" Lucas Arantes and others for helping resolve a long-standing, hopefully
+"   spurious warning
 " David Emett - for some major bug fixes and logic improvements.
 "               (I'm still most impressed you understood the thing)
 " D Barsam, and others, for suggestions about optional mappings and commands.
@@ -24,6 +26,9 @@
 "   and then restore the globals to window variables with another function.
 "
 " Changelog:
+" 1.14 - Convert warning to debug message for certain types of buffers, which
+"        appear to be un-named, eg floating windows for fzf in neovim,
+"        tabnew, and no doubt others.
 " 1.13 - Improve error message behaviour thanks to louwers@github.
 "        Fix error when debug enabled thanks to nkgm@github and pavoljuhas@github.
 " 1.12 - Convert to bundle format prior to uploading to github
@@ -644,7 +649,7 @@ function! <SID>UpdateLastColumn(event) "{{{1
     let w:BufKillColumnList += repeat([0], index - len(w:BufKillColumnList) + 1)
     let w:BufKillColumnList[index] = col('.')
   else
-    echom 'UpdateLastColumn failed to find bufnr ' . bufnr('%') . ' in w:BufKillList'
+    call s:Debug(2, DebugF, 'UpdateLastColumn failed to find bufnr ' . bufnr('%') . ' in w:BufKillList')
   endif
   call s:Debug(2, DebugF, 'w:BufKillList')
   call s:Debug(2, DebugF, 'w:BufKillColumnList')
