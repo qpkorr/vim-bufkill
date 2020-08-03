@@ -406,7 +406,11 @@ function! <SID>BufKill(cmd, bang) "{{{1
   if bufexists(s:BufKillBufferToKill)
     let killCmd = a:cmd . a:bang . s:BufKillBufferToKill
     call s:Debug(2, DebugF, 'killCmd = ' . killCmd)
-    exec killCmd
+    try
+      exec killCmd
+    catch /E516: No buffers were deleted/
+      call s:Debug(2, DebugF, 'buffer #'.s:BufKillBufferToKill.' removed during GotoBuffer step')
+    endtry
   else " Debug
     call s:Debug(2, DebugF, 'buffer #'.s:BufKillBufferToKill.' removed during GotoBuffer step')
   endif
