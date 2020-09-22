@@ -29,43 +29,50 @@ This plugin follows the standard runtime path structure, and as such it can be i
 
 ## Usage
 
-#### Unloading/Deleting/Wiping
+### Unloading/Deleting/Wiping
 
-When you wish to unload a file from the buffer and keep the window/split intact:
+All of the following keep the window/split intact:
 
-`:BUN`
-
-When you wish to delete a file from the buffer and keep the window/split intact:
-
-`:BD`
-
-When you wish to wipe a file from the buffer and keep the window/split intact:
-
-`:BW`
+|Action|Command|
+|:-----|:------|
+|Unload a file from the buffer|`:BUN`|
+|Delete a file from the buffer|`:BD`|
+|Wipe a file from the buffer|`:BW`|
 
 Notice how the key mappings are the uppercase version of the `:bun` `:bd` `:bw` Vim commands? Easy!
 
-#### Moving through buffers
+### Moving through buffers
 
-To move backwards through recently accessed buffers:
+|Action|Command|
+|:-----|:------|
+|Move backwards through recently accessed buffers|`:BB`|
+|Move forwards through recently accessed buffers|`:BF`|
+|Move to an alternate buffer and keep the cursor in the same column|`:BA`|
 
-`:BB`
+### Options & Mappings
 
-and to move forwards:
+The following would need to be set your `.vimrc`.
 
-`:BF`
+```viml
+" Turn off default <leader>bb, <leader>bd, etc. mappings (default: 1)
+let g:BufKillCreateMappings = 0
 
-To move to an alternate buffer and keep the cursor in the same column, use:
+" Override default <C-^> behavior for swapping between alternate buffers (default: 0)
+let g:BufKillOverrideCtrlCaret = 1
 
-`:BA`
+" Modify the command prefix if it conflicts with other plugins
+" The below changes BD to DD, BB to DB, etc. (default: 'B')
+let g:BufKillCommandPrefix = 'D'
 
-#### Also...
-
-You can also override `Ctrl-^` (Vim's default for swapping between alternate buffers) via `g:BufKillOverrideCtrlCaret` in your `/.vimrc` file.
+" If the buffer you want to kill is in many windows, the following option governs what to do (default: 'confirm', options: 'confirm'/'kill'/'cancel')
+let g:BufKillActionWhenBufferDisplayedInAnotherWindow = 'kill'
+```
 
 You can overide the default mappings within your `/.vimrc` file like so:
 
-`map <C-c> :BD<cr>`
+```viml
+map <C-c> :BD<cr>
+```
 
 resulting in being able to delete a file from the buffer via vim-bufkill with <kbd>CTRL</kbd> + <kbd>c</kbd>
 
