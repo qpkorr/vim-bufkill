@@ -51,7 +51,7 @@ Notice how the key mappings are the uppercase version of the `:bun` `:bd` `:bw` 
 
 ### Options & Mappings
 
-The following would need to be set your `.vimrc`.
+The following would need to be set in your `.vimrc`.
 
 ```viml
 " Turn off default <leader>bb, <leader>bd, etc. mappings (default: 1)
@@ -81,6 +81,7 @@ resulting in being able to delete a file from the buffer via vim-bufkill with <k
 Contributions and pull requests are welcome.
 
 A big thanks to Oli Morris for his excellent rewrite of this README file, and creating the animated gifs.
+Likewise to Julian Torres for further improvements to the README file.
 
 [1]: https://github.com/tpope/vim-pathogen
 [2]: https://github.com/gmarik/vundle
