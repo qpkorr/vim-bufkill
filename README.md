@@ -1,5 +1,11 @@
 # vim-bufkill
 
+## Note re github repo
+
+This repo hit some issues, seemingly due to git changes that appear to have broken git subtree push. I mistakenly pushed about 4000 unrelated commits into the repo.  I've tried to fix things with help from github support, but my apologies if any forks or clones got messed up.
+
+## Description
+
 In Vim, trying to unload, delete or wipe a buffer without closing the window or split? You'll like this:
 
 **With bufkill:**
